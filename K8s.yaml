@@ -1,0 +1,1806 @@
+K8s $ kubectl get pod
+No resources found in default namespace.
+K8s $
+
+NAMESPACE OF K8S
+--------------------------------------
+
+K8s $ kubectl get pod -n kube-system
+NAME                               READY   STATUS    RESTARTS      AGE
+coredns-5dd5756b68-xbsh9           1/1     Running   0             12m
+etcd-minikube                      1/1     Running   0             13m
+kube-apiserver-minikube            1/1     Running   0             13m
+kube-controller-manager-minikube   1/1     Running   0             13m
+kube-proxy-kkbkq                   1/1     Running   0             12m
+kube-scheduler-minikube            1/1     Running   0             13m
+storage-provisioner                1/1     Running   1 (12m ago)   13m
+K8s $
+K8s $
+K8s $
+
+
+K8s $ kubectl get namespace
+NAME              STATUS   AGE
+default           Active   13m
+kube-node-lease   Active   13m
+kube-public       Active   13m
+kube-system       Active   13m
+K8s $
+
+
+==================================
+
+vi pod.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-nginx-pod
+spec:
+  containers:
+  - name: nginx
+    image: nginx:1.14.2
+    ports:
+    - containerPort: 80
+-------------------------------
+
+Don't launch POD directly
+
+                       \_ ReplicaSet
+
+
+vi rs.yaml
+
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: nginx-replicaset
+spec:
+  replicas: 3  
+  spec:
+      containers:
+      - name: nginx-container
+        image: nginx:latest
+    ports:
+    - containerPort: 80
+
+
+==================================================
+
+vi mydeployment.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx-container
+        image: nginx:latest
+
+
+https://kubernetes.io/docs/reference/kubectl/quick-reference/
+Kubectl Cheet Sheet
+
+
+kubectl scale --replicas=10 deployment/nginx-deployment
+Modify the YAML -----> re-apply it
+
+---------------
+
+vi namespace.yaml
+
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test
+
+vi deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  namespace: test  
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx-container
+        image: nginx:latest
+
+
+
+Labels
+Labels are key-value pairs associated with objects in Kubernetes. 
+They are used to identify and categorize resources.
+
+Selectors
+Selectors are used to filter and select resources based on labels. 
+They define rules for identifying a set of resources.
+
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-nginx-deployment
+  labels:
+    app: nginx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx-container
+        image: nginx:latest
+
+
+=================================================================
+
+nginx-deployment-5bd48798f4-26465   1/1     Running   0          26s   10.244.1.5    aks-agentpool-25443946-vmss000000 
+
+nginx-deployment-5bd48798f4-kvmng   1/1     Running   0          4s    10.244.1.6    aks-agentpool-25443946-vmss000000
+
+
+vi nginx-deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+
+
+kubectl apply -f nginx-deployment.yaml
+
+
+vi nginx-service.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  selector:
+    app: nginx
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: ClusterIP
+
+Endpoints:         10.244.0.14,  10.244.0.14
+                  10.244.1.11,  10.244.1.10   -----------> 10.244.1.11
+                  10.244.1.9    10.244.1.9
+
+
+\_ Whebn we create SVC 
+                     \_ SVC will Endpoints
+                                        \_ Keep track of IPs of all the PODS
+
+
+
+NodePort
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  selector:
+    app: nginx
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+      nodePort: 30080 
+  type: NodePort
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  selector:
+    app: nginx
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: LoadBalancer
+
+=============================================================
+
+Storage in Kubernetes
+--------------------------
+
+Containers -------> docker exec -it <>  ------> file ----> data 
+
+
+vi mypod1.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-pod
+spec:
+  containers:
+  - image: nginx
+    name: nginx-container
+    volumeMounts:
+    - mountPath: /my-data
+      name: my-data-volume
+  volumes:
+  - name: my-data-volume
+    emptyDir: {}
+
+
+---------------------------
+
+vi my3pod.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-shared-volume
+spec:
+  containers:
+  - image: ubuntu
+    name: container-1
+    command: ['/bin/bash', '-ec', 'sleep 3600']
+    volumeMounts:
+    - mountPath: /my-data-1
+      name: my-data-volume
+
+  - image: ubuntu
+    name: container-2
+    command: ['/bin/bash', '-ec', 'sleep 3600']
+    volumeMounts:
+    - mountPath: /my-data-2
+      name: my-data-volume
+
+  - image: ubuntu
+    name: container-3
+    command: ['/bin/bash', '-ec', 'sleep 3600']
+    volumeMounts:
+    - mountPath: /my-data-3
+      name: my-data-volume
+
+  volumes:
+  - name: my-data-volume
+    emptyDir: {}
+
+--------------------------------------------------------
+
+
+vi pv.yaml
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: example-pv
+spec:
+  capacity:
+    storage: 1Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/mnt/data"
+
+
+vi pvc.yaml
+
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: example-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+
+vi deployment.yaml
+
+apiVersion: apps/V1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        volumeMounts:
+        - name: storage-volume
+          mountPath: /usr/share/nginx/html
+  volumes:
+  - name: storage-volume
+    persistentVolumeClaim:
+      claimName: example-pvc
+
+
+vi mycm.yaml
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-configmap
+data:
+  app.properties: |
+    server.host: example.com
+    server.port: "8080"
+  database.properties: |
+    database.url: jdbc:mysql://db.example.com:3306/mydatabase
+    database.username: myuser
+
+
+vi mysecret.yaml
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-secret
+type: Opaque
+data:
+  username: dXNlcm5hbWU=  # base64-encoded "username"
+  password: cGFzc3dvcmQ=  # base64-encoded "password"
+
+
+vi mynewdeploy.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/nginx/conf.d
+        - name: secret-volume
+          mountPath: /etc/nginx/secrets
+  volumes:
+  - name: config-volume
+    configMap:
+      name: my-configmap
+  - name: secret-volume
+    secret:
+      secretName: my-secret
+
+
+
+
+================================
+
+Step # 1:
+
+minikube ssh ----------> we are going inside the Cluster
+mkdir /mnt/data 
+echo " We are creating PVC and PV"  > /mnt/data/data.txt 
+exit
+
+
+vi mypv.yaml
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+spec:
+  storageClassName: local-pv
+  capacity:
+    storage: 500Mi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /mnt/data
+
+
+vi mypvc.yaml
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-local
+spec:
+  storageClassName: local-pv
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+
+
+vi mypod.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-local-pvc
+spec:
+  restartPolicy: Never
+  containers:
+  - image: ubuntu
+    name: ubuntu-container
+    command: ['/bin/bash', '-ec', 'cat /data/application/data.txt']
+    volumeMounts:
+    - mountPath: /data/application
+      name: local-volume
+  volumes:
+  - name: local-volume
+    persistentVolumeClaim:
+      claimName: pvc-local
+
+===================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: azure-vote-back
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: azure-vote-back
+  template:
+    metadata:
+      labels:
+        app: azure-vote-back
+    spec:
+      containers:
+      - name: azure-vote-back
+        image: redis
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+        ports:
+        - containerPort: 6379
+          name: redis
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: azure-vote-back
+spec:
+  ports:
+  - port: 6379
+  selector:
+    app: azure-vote-back
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: azure-vote-front
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: azure-vote-front
+  template:
+    metadata:
+      labels:
+        app: azure-vote-front
+    spec:
+      containers:
+      - name: azure-vote-front
+        image: microsoft/azure-vote-front:v1
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+        ports:
+        - containerPort: 80
+        env:
+        - name: REDIS
+          value: "azure-vote-back"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: azure-vote-front
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+  selector:
+    app: azure-vote-front
+
+==========================================================================
+
+
+terraform + verb + switches
+
+
+Terraform  $ terraform init
+
+Initializing the backend...
+
+Initializing provider plugins...
+- Finding latest version of hashicorp/aws...
+- Installing hashicorp/aws v5.31.0...
+- Installed hashicorp/aws v5.31.0 (signed by HashiCorp)
+
+Terraform has created a lock file .terraform.lock.hcl to record the provider
+selections it made above. Include this file in your version control repository
+so that Terraform can guarantee to make the same selections by default when
+you run "terraform init" in the future.
+
+Terraform has been successfully initialized!
+
+You may now begin working with Terraform. Try running "terraform plan" to see
+any changes that are required for your infrastructure. All Terraform commands
+should now work.
+
+If you ever set or change modules or backend configuration for Terraform,
+rerun this command to reinitialize your working directory. If you forget, other
+commands will detect it and remind you to do so if necessary.
+Terraform  $
+=================================================================================================================================
+
+
+# Terraform Settings Block
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      #version = "~> 3.21" # Optional but recommended in production
+    }
+  }
+}
+
+Terraform Settings Block:
+
+It specifies the required provider(s) and their versions. 
+In your case, you are using the AWS provider from HashiCorp with the source version specified.
+
+
+# Provider Block
+provider "aws" {
+  profile = "default" # AWS Credentials Profile configured on your local desktop terminal  $HOME/.aws/credentials
+  region  = "ap-south-1"
+}
+
+
+Provider Block:
+
+This block configures the AWS provider with specific settings. In your case:
+profile: 
+
+Specifies the AWS credentials profile to be used. In this example, it's set to "default," which 
+corresponds to the profile in your local AWS credentials file ($HOME/.aws/credentials).
+region: Specifies the AWS region where the resources will be created. In this example, it's set to "ap-south-1."
+
+# Resource Block
+resource "aws_instance" "ec2demo" {
+  ami           = "ami-06f621d90fa29f6d0" # Amazon Linux in us-east-1, update as per your region
+  instance_type = "t2.micro"
+}
+
+======================================================================================
+
+# Terraform Settings Block
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      #version = "~> 3.21" # Optional but recommended in production
+    }
+  }
+}
+
+# Provider Block
+provider "aws" {
+  profile = "default" # AWS Credentials Profile configured on your local desktop terminal  $HOME/.aws/credentials
+  region  = "ap-south-1"
+}
+
+# Resource Block for VPC
+resource "aws_vpc" "my_vpc" {
+  cidr_block = "10.0.0.0/16"
+  enable_dns_support = true
+  enable_dns_hostnames = true
+
+  tags = {
+    Name = "MyVPC"
+  }
+}
+
+# Resource Block for Subnet
+resource "aws_subnet" "my_subnet" {
+  vpc_id     = aws_vpc.my_vpc.id
+  cidr_block = "10.0.1.0/24"
+  availability_zone = "ap-south-1a" # Change this to your preferred availability zone
+
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "MySubnet"
+  }
+}
+
+# Resource Block for EC2 Instance
+resource "aws_instance" "ec2demo" {
+  ami           = "ami-06f621d90fa29f6d0" # Amazon Linux in us-east-1, update as per your region
+  instance_type = "t2.micro"
+  subnet_id     = aws_subnet.my_subnet.id
+}
+===================================
+
+
+resource "aws_cloudfront_cache_policy" "example" {
+  name        = "example-policy"
+  comment     = "test comment"
+  default_ttl = 50
+  max_ttl     = 100
+  min_ttl     = 1
+  parameters_in_cache_key_and_forwarded_to_origin {
+    cookies_config {
+      cookie_behavior = "whitelist"
+      cookies {
+        items = ["example"]
+      }
+    }
+    headers_config {
+      header_behavior = "whitelist"
+      headers {
+        items = ["example"]
+      }
+    }
+    query_strings_config {
+      query_string_behavior = "whitelist"
+      query_strings {
+        items = ["example"]
+      }
+    }
+  }
+}
+===============================================================
+
+
+
+# Terraform Settings Block
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      #version = "~> 3.21" # Optional but recommended in production
+    }
+  }
+}
+
+# Provider Block
+provider "aws" {
+  profile = "default" # AWS Credentials Profile configured on your local desktop terminal  $HOME/.aws/credentials
+  region  = "ap-south-1"
+}
+
+# Resource Block for VPC
+resource "aws_vpc" "my_vpc" {
+  cidr_block = "10.0.0.0/16"
+  enable_dns_support = true
+  enable_dns_hostnames = true
+
+  tags = {
+    Name = "MyVPC"
+  }
+}
+
+# Resource Block for Subnet
+resource "aws_subnet" "my_subnet" {
+  vpc_id     = aws_vpc.my_vpc.id
+  cidr_block = "10.0.1.0/24"
+  availability_zone = "ap-south-1a" # Change this to your preferred availability zone
+
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "MySubnet"
+  }
+}
+
+# Resource Block for EC2 Instance
+resource "aws_instance" "ec2demo" {
+  ami           = "ami-06f621d90fa29f6d0" # Amazon Linux in us-east-1, update as per your region
+  instance_type = "t2.micro"
+  subnet_id     = aws_subnet.my_subnet.id
+
+  user_data = <<-EOF
+              #!/bin/bash
+              yum update -y
+              yum install -y httpd
+              service httpd start
+              chkconfig httpd on
+              EOF
+}
+
+=========================================================================
+BACKEND:
+  ================
+
+
+
+# main.tf
+
+# Provider Block
+provider "aws" {
+  region = "ap-south-1"
+}
+
+# Resource Block for EC2 Instance
+resource "aws_instance" "example_instance" {
+  ami           = "ami-06f621d90fa29f6d0" # Amazon Linux 2 in ap-south-1, update as per your region
+  instance_type = "t2.micro"
+
+  tags = {
+    Name = "example-instance"
+  }
+}
+
+
+# backend.tf
+
+# Terraform Settings Block with Backend Configuration
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      # version = "~> 3.21" # Optional but recommended in production
+    }
+  }
+
+  # Adding Backend as S3 for Remote State Storage with State Locking
+  backend "s3" {
+    bucket = "kumarnewbucket"
+    key    = "myTFstatefile/terraform.tfstate"
+    region = "ap-south-1"
+  }
+}
+======================================================
+=========================================
+========================================
+
+
+c1-versions.tf
+===========
+
+# Terraform Block
+terraform {
+  required_version = ">= 1.4" 
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 4.0"
+    }
+  }
+}
+
+# Provider Block
+provider "aws" {
+  region  = var.aws_region
+  profile = "default"
+}
+
+
+c2-variables.tf
+
+# Input Variables
+variable "aws_region" {
+  description = "Region in which AWS resources to be created"
+  type        = string
+  default     = "ap-south-1"
+}
+
+variable "ec2_ami_id" {
+  description = "AMI ID"
+  type        = string
+  default     = "ami-07d3a50bd29811cd1" # Amazon2 Linux AMI ID
+}
+
+variable "ec2_instance_count" {
+  description = "EC2 Instance Count"
+  type        = number
+  default     = 1
+}
+
+
+
+c3-security-groups.tf
+
+# Create Security Group - SSH Traffic
+resource "aws_security_group" "vpc-ssh" {
+  name        = "vpc-ssh"
+  description = "Dev VPC SSH"
+  ingress {
+    description = "Allow Port 22"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    description = "Allow all IP and Ports outbound"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# Create Security Group - Web Traffic
+resource "aws_security_group" "vpc-web" {
+  name        = "vpc-web"
+  description = "Dev VPC Web"
+
+  ingress {
+    description = "Allow Port 80"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "Allow Port 443"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description = "Allow all IP and Ports outbound"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+
+c4-ec2-instance.tf
+
+# Create EC2 Instance
+resource "aws_instance" "my-ec2-vm" {
+  ami                    = var.ec2_ami_id
+  instance_type          = "t3.micro"
+  key_name               = "terraform-key"
+  count                  = var.ec2_instance_count
+  user_data              = <<-EOF
+    #!/bin/bash
+    sudo yum update -y
+    sudo yum install httpd -y
+    sudo systemctl enable httpd
+    sudo systemctl start httpd
+    echo "<h1>Hello ! We are learning Terrafom</h1>" > /var/www/html/index.html
+    EOF
+  vpc_security_group_ids = [aws_security_group.vpc-ssh.id, aws_security_group.vpc-web.id]
+  tags = {
+    "Name" = "myec2vm"
+  }
+}
+
+
+terraform apply > terraform.log 2>&1
+
+
+==============================================================
+
+
+# main.tf
+
+provider "aws" {
+  region = "us-west-2"  # Set your desired AWS region
+}
+
+module "vpc" {
+  source = "terraform-aws-modules/vpc/aws"
+
+  name                 = "my-vpc"
+  cidr                 = "10.0.0.0/16"
+  azs                  = ["us-west-2a", "us-west-2b", "us-west-2c"]
+  private_subnets      = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+  public_subnets       = ["10.0.4.0/24", "10.0.5.0/24", "10.0.6.0/24"]
+  enable_nat_gateway   = true
+  single_nat_gateway   = true
+}
+
+module "eks" {
+  source          = "terraform-aws-modules/eks/aws"
+  cluster_name    = "my-eks-cluster"
+  subnets         = module.vpc.private_subnets
+  vpc_id          = module.vpc.vpc_id
+  cluster_version = "1.26"  # Specify the desired Kubernetes version
+}
+
+output "kubeconfig" {
+  value = module.eks.kubeconfig
+}
+==========================
+
+98.70.13.172  |  10.5.0.4  ----- Master
+98.70.14.1    |  10.5.0.5  ClientA
+98.70.13.241  |  10.6.0.4  CleinetB
+
+Ansible Installation:
+https://docs.ansible.com/ansible/latest/installation_guide/installation_distros.html#installing-ansible-on-debian
+$ sudo apt update
+$ sudo apt install software-properties-common
+$ sudo add-apt-repository --yes --update ppa:ansible/ansible
+$ sudo apt install ansible
+
+
+[webservers]
+10.5.0.5
+
+[dbservers]
+98.70.13.241
+
+Ansible Ad-hoc commands
+
+ansible -m ping webservers
+ansible -m ping dbservers
+
+==================================================================================
+
+
+collect all the commands ------> in a file -----> save that file ----> run that file
+
+
+\_ Playbook
+          \_ Collection of plays
+                               \_ Collection of TASks
+
+PLAYBOOK ------> we write in YAML
+                                \_ dcelerative 
+
+
+================================================================================
+
+---
+- name: Create user on remote servers
+  hosts: your_remote_servers
+  tasks:
+    - name: Add a new user
+      user:
+        name: your_username
+        password: your_password
+        state: present                             
+-----------------------------------------
+
+---
+- name: Get server information
+  hosts: your_remote_servers
+  tasks:
+    - name: Gather facts
+      gather_facts: true
+    - name: Display server facts
+      debug:
+        var: ansible_facts
+
+------------------------------
+---
+- name: Install Nginx
+  hosts: your_remote_servers
+  tasks:
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+----------------------------------
+
+
+Server -------> /tmp 
+example.txt
+
+
+PLAYBOOK
+
+---
+- name: Create a file in /mydata on Ubuntu
+  hosts: webservers
+  become: yes  
+
+  tasks:
+    - name: Ensure the /mydata directory exists
+      ansible.builtin.file:
+        path: /mydata
+        state: directory
+        mode: '0755'
+
+    - name: Create a file in /mydata
+      ansible.builtin.file:
+        path: /mydata/example.txt
+        state: touch
+        mode: '0644'
+=============================
+
+- name: Change file ownership, group and permissions
+  ansible.builtin.file:
+    path: /etc/foo.conf
+    owner: foo
+    group: foo
+    mode: '0644'
+
+- name: Give insecure permissions to an existing file
+  ansible.builtin.file:
+    path: /work
+    owner: root
+    group: root
+    mode: '1777'
+
+- name: Create a symbolic link
+  ansible.builtin.file:
+    src: /file/to/link/to
+    dest: /path/to/symlink
+    owner: foo
+    group: foo
+    state: link
+
+- name: Create two hard links
+  ansible.builtin.file:
+    src: '/tmp/{{ item.src }}'
+    dest: '{{ item.dest }}'
+    state: hard
+  loop:
+    - { src: x, dest: y }
+    - { src: z, dest: k }
+
+- name: Touch a file, using symbolic modes to set the permissions (equivalent to 0644)
+  ansible.builtin.file:
+    path: /etc/foo.conf
+    state: touch
+    mode: u=rw,g=r,o=r
+
+- name: Touch the same file, but add/remove some permissions
+  ansible.builtin.file:
+    path: /etc/foo.conf
+    state: touch
+    mode: u+rw,g-wx,o-rwx
+
+- name: Touch again the same file, but do not change times this makes the task idempotent
+  ansible.builtin.file:
+    path: /etc/foo.conf
+    state: touch
+    mode: u+rw,g-wx,o-rwx
+    modification_time: preserve
+    access_time: preserve
+
+- name: Create a directory if it does not exist
+  ansible.builtin.file:
+    path: /etc/some_directory
+    state: directory
+    mode: '0755'
+
+- name: Update modification and access time of given file
+  ansible.builtin.file:
+    path: /etc/some_file
+    state: file
+    modification_time: now
+    access_time: now
+
+- name: Set access time based on seconds from epoch value
+  ansible.builtin.file:
+    path: /etc/another_file
+    state: file
+    access_time: '{{ "%Y%m%d%H%M.%S" | strftime(stat_var.stat.atime) }}'
+
+- name: Recursively change ownership of a directory
+  ansible.builtin.file:
+    path: /etc/foo
+    state: directory
+    recurse: yes
+    owner: foo
+    group: foo
+
+- name: Remove file (delete file)
+  ansible.builtin.file:
+    path: /etc/foo.txt
+    state: absent
+
+- name: Recursively remove directory
+  ansible.builtin.file:
+    path: /etc/foo
+    state: absent
+
+-------------------------------------------------------------------------------------
+
+
+---
+- name: Install Nginx on Ubuntu
+  hosts: webservers
+  become: yes  
+
+  tasks:
+    - name: Update apt package cache
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Install Nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+
+    - name: Start Nginx service
+      ansible.builtin.service:
+        name: nginx
+        state: started
+        enabled: yes
+
+DS -----> Nginx nmust be installed 
+
+
+REMOVE nginx
+
+---
+- name: Remove Nginx from Ubuntu
+  hosts: webservers
+  become: yes  # Run tasks with sudo (root) privileges
+
+  tasks:
+    - name: Stop Nginx service
+      ansible.builtin.service:
+        name: nginx
+        state: stopped
+        enabled: no
+
+    - name: Remove Nginx package
+      ansible.builtin.apt:
+        name: nginx
+        state: absent
+
+
+================================
+
+vi install_docker.yml
+
+---
+- name: Install Docker on Ubuntu
+  hosts: webservers
+  become: yes  
+
+  tasks:
+    - name: Update apt package cache
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Install required packages
+      ansible.builtin.apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+        state: present
+
+    - name: Add Docker GPG key
+      ansible.builtin.apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+
+    - name: Add Docker repository
+      ansible.builtin.apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
+        state: present
+
+    - name: Install Docker
+      ansible.builtin.apt:
+        name: docker-ce
+        state: present
+
+    - name: Start Docker service
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: yes
+
+export ANSIBLE_LOG_PATH=/path/to/ansible.log
+ansible-playbook -i inventory_file my_playbook.yml --log-file=/path/to/ansible.log
+
+
+ansible-playbook -i inventory_file my_playbook.yml -vvv
+
+
+Default Location of Inventory File:
+/etc/ansible/hosts  -----> default file
+
+We can modify this file
+We can create our own Inventory file.
+
+ansible-playbook -i inventory_file my_playbook.yml 
+
+
+/etc/ansible/hosts
+## green.example.com
+## blue.example.com
+## 192.168.100.1
+## 192.168.100.10
+
+# Ex 2: A collection of hosts belonging to the 'webservers' group:
+
+## [webservers]
+## alpha.example.org
+## beta.example.org
+## 192.168.1.100
+## 192.168.1.110
+
+# If you have multiple hosts following a pattern, you can specify
+# them like this:
+
+## www[001:006].example.com
+
+# Ex 3: A collection of database servers in the 'dbservers' group:
+
+## [dbservers]
+##
+## db01.intranet.mydomain.net
+## db02.intranet.mydomain.net
+## 10.25.1.56
+## 10.25.1.57
+
+# Here's another example of host ranges, this time there are no
+# leading 0s:
+
+## db-[99:101]-node.example.com
+[webservers]
+10.5.0.5
+
+[dbservers]
+98.70.13.241
+
+--------------------------------------
+
+we will install MYSql over the DB Server 
+
+1: Write Playbook
+2: Call the dbservers
+hosts: dbserver
+3:task: 
+    \_ mysql ---> state ----> present
+    \_ mysql -----> service ---> enabled/running
+
+
+vi install_mysql.yml
+---
+- name: Install MySQL on Ubuntu
+  hosts: dbservers
+  become: yes
+
+  tasks:
+    - name: Update apt package cache
+      apt:
+        update_cache: yes
+
+    - name: Install MySQL Server
+      apt:
+        name: mysql-server
+        state: present
+
+    - name: Start MySQL service
+      service:
+        name: mysql
+        state: started
+
+    - name: Secure MySQL installation
+      expect:
+        command: mysql_secure_installation
+        responses:
+          'Enter current password for root (enter for none):': ''
+          'Set root password? [Y/n]': 'Y'
+          'New password:': 'root@123'
+          'Re-enter new password:': 'root@123'
+          'Remove anonymous users? [Y/n]': 'Y'
+          'Disallow root login remotely? [Y/n]': 'Y'
+          'Remove test database and access to it? [Y/n]': 'Y'
+          'Reload privilege tables now? [Y/n]': 'Y'
+
+    - name: Ensure MySQL service starts on boot
+      service:
+        name: mysql
+        enabled: yes
+
+
+ansible-playbook  install_mysql.yml
+
+-------------------
+
+
+vi install_minikube.yml
+
+---
+- name: Install Minikube on Ubuntu
+  hosts: dbservers
+  become: yes
+
+  tasks:
+    - name: Install required dependencies
+      apt:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - apt-transport-https
+        - curl
+
+    - name: Add Minikube GPG key
+      shell: "curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube_latest_amd64.deb && sudo dpkg -i minikube_latest_amd64.deb"
+      args:
+        creates: "/usr/local/bin/minikube"
+
+    - name: Install Minikube
+      apt:
+        name: minikube
+        state: present
+
+    - name: Verify Minikube installation
+      command: minikube version
+
+    - name: Start Minikube cluster
+      command: minikube start --driver=docker
+      ignore_errors: yes  # Ignore errors if Minikube is already running
+
+    - name: Set kubectl context to Minikube
+      command: kubectl config use-context minikube
+
+    - name: Install kubectl
+      apt:
+        name: kubectl
+        state: present
+
+
+
+==============================================
+
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql-statefulset
+spec:
+  serviceName: "mysql"
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:latest
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "password"
+        ports:
+        - containerPort: 3306
+          name: mysql
+  volumeClaimTemplates:
+  - metadata:
+      name: mysql-persistent-storage
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 1Gi
+
+=================================================================================
+
+
+
+Setup EFK Stack on Kubernetes
+------------------------------
+
+es-svc.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  labels:
+    app: elasticsearch
+spec:
+  selector:
+    app: elasticsearch
+  clusterIP: None
+  ports:
+    - port: 9200
+      name: rest
+    - port: 9300
+      name: inter-node
+
+kubectl create -f es-svc.yaml
+
+es-sts.yaml
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: es-cluster
+spec:
+  serviceName: elasticsearch
+  replicas: 3
+  selector:
+    matchLabels:
+      app: elasticsearch
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+    spec:
+      containers:
+      - name: elasticsearch
+        image: docker.elastic.co/elasticsearch/elasticsearch:7.5.0
+        resources:
+            limits:
+              cpu: 1000m
+            requests:
+              cpu: 100m
+        ports:
+        - containerPort: 9200
+          name: rest
+          protocol: TCP
+        - containerPort: 9300
+          name: inter-node
+          protocol: TCP
+        volumeMounts:
+        - name: data
+          mountPath: /usr/share/elasticsearch/data
+        env:
+          - name: cluster.name
+            value: k8s-logs
+          - name: node.name
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: discovery.seed_hosts
+            value: "es-cluster-0.elasticsearch,es-cluster-1.elasticsearch,es-cluster-2.elasticsearch"
+          - name: cluster.initial_master_nodes
+            value: "es-cluster-0,es-cluster-1,es-cluster-2"
+          - name: ES_JAVA_OPTS
+            value: "-Xms512m -Xmx512m"
+      initContainers:
+      - name: fix-permissions
+        image: busybox
+        command: ["sh", "-c", "chown -R 1000:1000 /usr/share/elasticsearch/data"]
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: data
+          mountPath: /usr/share/elasticsearch/data
+      - name: increase-vm-max-map
+        image: busybox
+        command: ["sysctl", "-w", "vm.max_map_count=262144"]
+        securityContext:
+          privileged: true
+      - name: increase-fd-ulimit
+        image: busybox
+        command: ["sh", "-c", "ulimit -n 65536"]
+        securityContext:
+          privileged: true
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+      labels:
+        app: elasticsearch
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      # storageClassName: ""
+      resources:
+        requests:
+          storage: 3Gi
+
+kubectl create -f es-sts.yaml
+
+
+Deploy Kibana Deployment & Service
+
+kibana-deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kibana
+  labels:
+    app: kibana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kibana
+  template:
+    metadata:
+      labels:
+        app: kibana
+    spec:
+      containers:
+      - name: kibana
+        image: docker.elastic.co/kibana/kibana:7.5.0
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 100m
+        env:
+          - name: ELASTICSEARCH_URL
+            value: http://elasticsearch:9200
+        ports:
+        - containerPort: 5601
+
+kubectl create -f kibana-deployment.yaml
+
+kibana-svc.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana-np
+spec:
+  selector: 
+    app: kibana
+  type: NodePort  
+  ports:
+    - port: 8080
+      targetPort: 5601 
+      nodePort: 30000
+
+kubectl create -f kibana-svc.yaml
+
+
+Deploy Fluentd Kubernetes
+-----------------------------
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluentd
+  labels:
+    app: fluentd
+spec:
+  selector:
+    matchLabels:
+      app: fluentd
+  template:
+    metadata:
+      labels:
+        app: fluentd
+    spec:
+      serviceAccount: fluentd
+      serviceAccountName: fluentd
+      containers:
+      - name: fluentd
+        image: fluent/fluentd-kubernetes-daemonset:v1.4.2-debian-elasticsearch-1.1
+        env:
+          - name:  FLUENT_ELASTICSEARCH_HOST
+            value: "elasticsearch.default.svc.cluster.local"
+          - name:  FLUENT_ELASTICSEARCH_PORT
+            value: "9200"
+          - name: FLUENT_ELASTICSEARCH_SCHEME
+            value: "http"
+          - name: FLUENTD_SYSTEMD_CONF
+            value: disable
+        resources:
+          limits:
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        volumeMounts:
+        - name: varlog
+          mountPath: /var/log
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+
+--------------------------------------------------------
+
+helm install elasticsearch elastic/elasticsearch -f values-pv.yaml
+helm install kibana elastic/kibana
+helm install fluentd bitnami/fluentd
+
+=====================
+
+git ---> 
+rebasing
+stash
+
+EFK
+==========
+
+CV prepration
+How seacrh for job
+Certification
+what are Certification you should target
+Non-IT and freshers
+==========================
+
+
+HELM -----> package manager of Kubernetes
+
+98.70.13.241
+98.70.14.1
+----------------------------------
+https://helm.sh/docs/intro/install/
+
+$ curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+$ chmod 700 get_helm.sh
+$ ./get_helm.sh
+
+
+==================
+
+Set up docker hub private repository to push java and node app images
+
+Create k8s cluster on minikube
+
+Deploy node and java app images in the cluster
+
+Deploy ElasticSearch with helm
+
+Deploy Kibana with helm
+
+Deploy FluentD with helm
+
+====================
+
+Clonig the REPO:
+  =====================
+
+mkdir my_efk_stack_new
+cd my_efk_stack
+git clone https://github.com/discover-devops/my-node-app.git
+git clone https://github.com/discover-devops/my_java_app.git
+
+
+Create out Node App
+cd my-node-app
+
+
+DOCKER_REGISTRY_SERVER=docker.io
+DOCKER_USER=discoverdevops
+DOCKER_EMAIL=xxxxxxxx
+DOCKER_PASSWORD=xxxxxx
+
+kubectl create secret docker-registry myregistrysecret \
+--docker-server=$DOCKER_REGISTRY_SERVER \
+--docker-username=$DOCKER_USER \
+--docker-password=$DOCKER_PASSWORD \
+--docker-email=$DOCKER_EMAIL
+
+
+
+Install Elasticsearch using helm:
+
+helm repo add elastic https://helm.elastic.co
+helm install elasticsearch elastic/elasticsearch 
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm install fluentd bitnami/fluentd  --set elasticsearch.host=elasticsearch-master --set elasticsearch.port=9200
+===============================================================
+
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo update
+helm install nginx-ingress ingress-nginx/ingress-nginx
+
+
+ Minimum of 3 years of DevOps experience
+
+Experience building, designing, and implementing infrastructure automation solutions
+
+o Minimum of 3 years of DevOps experience
+
+GCP Administration (GCP IAAS) - Ensure high availability of the infrastructure, administration, and overall support.
+
+o Experience using cloud specific services like Compute Engine, App Engine, GKE, Stack Driver, Anthos, managed services etc.
+
+o Google Cloud infrastructure provisioning including VPC, Subnet, Gateway, Security groups, Google Cloud SQL, Kubernetes Cluster etc.
+
+o Experience with automating Infrastructure as a code using Terraform, and shell scripting
+
+o Build, enhance, and maintain continuous integration/continuous delivery systems. 
+
+    Experience in design, develop and deploy GCP resources as Infra-as-code in Google Cloud Platform
+    Strong Knowledge in Automation frameworks, CI/CD process and tools (Jenkins, GitHub, Sonar Cube etc.) is a must
+    Strong Knowledge in Terraform and Sentinel is a plus
+    Familiarity with Agile Practices and Frameworks
+    Good knowledge on Kubernetes
+    Good knowledge on Java microservices with GCP exposure
+
+
+    A cloud DevOps engineer provides technical leadership in the CI/CD domains using Jenkins, Ansible, Terraform, Docker, AWS, and Kubernetes.
+
+    Responsible for designing and implementing DevOps solutions on AWS, Azure, Google, private cloud, etc.
+
+    Work with development, QA, and operations teams to automate the build, test, and deploy process.
+
+    Decide on and put into practice the safest and quickest method for getting code from development to production.
+
+    Responsible for the smooth operation of a company s IT infrastructure.
+
+    Work with developers to deploy and manage code changes, and with operations staff to ensure that systems are up and running smoothly.
+
+    Responsible for implementing processes throughout the systems development lifecycle using google 
+    recommended methodologies and tools.
+
+    Build and deploy software and infrastructure delivery pipelines, optimize and maintain production systems and services, and balance service reliability with delivery speed.
+
+
+having experience in CI/CD domains using Jenkins, Ansible, Terraform, Docker, AWS, and Kubernetes.
+
+
+https://resume.io/
